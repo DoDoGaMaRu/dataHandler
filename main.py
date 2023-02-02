@@ -1,7 +1,6 @@
 import nidaqmx
 import socketio
 import asyncio
-import logger
 
 from scipy import signal
 from sys import exit
