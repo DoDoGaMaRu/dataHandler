@@ -17,9 +17,9 @@ conf = ConfigParser()
 conf.read('resource/config.ini', encoding='utf-8')
 raw_directory = conf['csv']['directory']
 external_directory = conf['csv']['external_directory']
-server_address = conf['server']['address']
-machine_namespace = conf['server']['namespace']
-send_sampling_rate = int(conf['server']['send_sampling_rate'])
+server_address = conf['socket']['url']
+machine_namespace = conf['socket']['namespace']
+send_sampling_rate = int(conf['socket']['send_sampling_rate'])
 log_path = conf['log']['directory']
 
 
@@ -152,17 +152,20 @@ async def socket_connect():
             await sio.wait()
         except Exception as e:
             sys_logger.error('socket connect error - '+str(e))
-            await sio.sleep(10)
+            await sio.sleep(30)
 
 
 if __name__ == '__main__':
+    sys_logger.info('sensor initialization.')
     sensor_vib, sensor_temp = sensor_load(conf)
     main_loop = asyncio.get_event_loop()
 
+    sys_logger.info('start background task.')
     sensor_task_vib = sio.start_background_task(sensor_loop_vib)
     sensor_task_temp = sio.start_background_task(sensor_loop_temp)
 
     try:
+        sys_logger.info('start application.')
         main_loop.run_until_complete(socket_connect())
     except KeyboardInterrupt:
         sys_logger.info('Waiting for application shutdown.')
