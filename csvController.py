@@ -5,6 +5,7 @@ import shutil
 from typing import List
 
 from clock import get_day
+from logger import LoggerFactory
 
 
 async def save_data(path, datas):
@@ -24,11 +25,12 @@ class CsvController:
                  header: List[str],
                  external_directory: str):
         self.writer = CsvWriter(header)
-        self.directory = directory
         self.device_name = device_name
-
+        self.directory = directory
         self.external_directory = external_directory
         self.last_date = get_day()
+
+        self.logger = LoggerFactory.get_logger()
 
     async def init_dirs(self):
         if not os.path.exists(self.directory):
@@ -39,8 +41,8 @@ class CsvController:
         date = get_day()
         path = await self.get_file_path(date)
 
-        await self.writer.save(path, datas)
         await self.trigger(date)
+        await self.writer.save(path, datas)
 
     async def get_file_path(self, date: str) -> str:
         file_name = await make_file_name(self.device_name, date)
@@ -49,21 +51,26 @@ class CsvController:
     async def trigger(self, date):
         is_day_changed = self.last_date != date
         if is_day_changed:
-            await self.move_file(self.last_date)
+            await self.move_all_file()
             self.last_date = date
 
-    async def move_file(self, date: str):
-        file_name = await make_file_name(self.device_name, date)
-        src_path = os.path.join(self.directory, file_name)
-        dest_path = os.path.join(self.external_directory, file_name)
+    async def move_all_file(self):
+        files = os.listdir(self.directory)
 
-        if os.path.isfile(src_path) and os.path.isdir(self.external_directory):
-            shutil.move(src_path, dest_path)
+        if os.path.isdir(self.external_directory):
+            for file_name in files:
+                src_path = os.path.join(self.directory, file_name)
+                dest_path = os.path.join(self.external_directory, file_name)
+
+                shutil.move(src_path, dest_path)
+        else:
+            self.logger.error('전송 대상 폴더가 존재하지 않습니다, config의 external_directory를 존재하는 폴더로 지정해주십시오.')
 
 
 class CsvWriter:
     def __init__(self, header: List[str]):
         self.header = header
+        self.logger = LoggerFactory.get_logger()
 
     async def file_init(self, path: str):
         if not os.path.isfile(path):
@@ -78,5 +85,5 @@ class CsvWriter:
             transpose = [list(x) for x in zip(*datas)]
             await save_data(path, transpose)
         except Exception as e:
-            print('예외가 발생하였습니다. 전체 로그를 개발자에게 전달 부탁드립니다.')
-            print(e)
+            self.logger.error('csv 저장 중 예외가 발생하였습니다. 전체 로그를 개발자에게 전달 부탁드립니다.')
+            self.logger.error(str(e))

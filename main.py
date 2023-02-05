@@ -8,7 +8,7 @@ from time import ctime, time
 from configparser import ConfigParser
 
 from sensor import Sensor
-from rawController import RawdataController
+from rawdataController import RawdataController
 from logger import LoggerFactory
 
 
@@ -23,9 +23,11 @@ log_path = conf['log']['directory']
 
 
 ''' 
-    sys_logger      : 
+    sys_logger      : Process system logs. To save the log file, set the argument 
+                      save_file to True and set save_path to the desired directory 
+                      path.
 
-    rdc             : 
+    rdc             : An object that performs all processing on rawdata
 '''
 
 
@@ -72,10 +74,6 @@ def try_sensor_load(config: ConfigParser):
     return vib, temp
 
 
-async def read_sensor(sensor: Sensor):
-    return sensor.task.read(number_of_samples_per_channel=sensor.read_count, timeout=10.0)
-
-
 async def get_sensor_message(now_time, data_tag_names, data_list):
     message = {
         'time': now_time
@@ -103,7 +101,7 @@ async def add_data_by_event(event_name, message):
 
 async def try_read(sensor: Sensor, event_name: str, data_tag_names: list):
     now_time = ctime(time())
-    data_list = await read_sensor(sensor)
+    data_list = await sensor.read()
     message = await get_sensor_message(now_time, data_tag_names, data_list)
     resampled_message = await resample_message(message, send_sampling_rate, data_tag_names)
 
@@ -116,10 +114,10 @@ async def try_read(sensor: Sensor, event_name: str, data_tag_names: list):
 async def read(sensor: Sensor, event_name: str, data_tag_names: list):
     try:
         await try_read(sensor, event_name, data_tag_names)
-    except nidaqmx.errors.DaqReadError:
+    except nidaqmx.errors.DaqReadError as error:
         pass
     except Exception as error:
-        print(error)
+        sys_logger.error('정의되지 않은 오류가 발생하였습니다 : ' + str(error))
 
 
 async def sensor_loop_vib():
@@ -134,12 +132,12 @@ async def sensor_loop_temp():
 
 @sio.on('connect', namespace=machine_namespace)
 def on_connect():
-    sys_logger.info('connection established')
+    sys_logger.info('server connection established')
 
 
 @sio.on('disconnect', namespace=machine_namespace)
 def on_disconnect():
-    sys_logger.info('connection closed')
+    sys_logger.info('server connection closed')
 
 
 async def socket_connect():
@@ -151,10 +149,11 @@ async def socket_connect():
             await sio.wait()
         except Exception as e:
             sys_logger.error('socket connect error - '+str(e))
-            await sio.sleep(30)
+            await sio.sleep(60)
 
 
 if __name__ == '__main__':
+    sys_logger.info('start application.')
     sys_logger.info('sensor initialization.')
     sensor_vib, sensor_temp = sensor_load(conf)
     main_loop = asyncio.get_event_loop()
@@ -164,7 +163,6 @@ if __name__ == '__main__':
     sensor_task_temp = sio.start_background_task(sensor_loop_temp)
 
     try:
-        sys_logger.info('start application.')
         main_loop.run_until_complete(socket_connect())
     except KeyboardInterrupt:
         sys_logger.info('Waiting for application shutdown.')
