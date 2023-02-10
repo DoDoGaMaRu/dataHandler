@@ -8,14 +8,11 @@ from time import ctime, time
 from configparser import ConfigParser
 
 from sensor import Sensor
-from rawdataController import RawdataController
 from logger import LoggerFactory
 
 
 conf = ConfigParser()
 conf.read('resource/config.ini', encoding='utf-8')
-raw_directory = conf['csv']['directory']
-external_directory = conf['csv']['external_directory']
 server_address = conf['socket']['url']
 machine_namespace = conf['socket']['namespace']
 send_sampling_rate = int(conf['socket']['send_sampling_rate'])
@@ -37,8 +34,6 @@ LoggerFactory.init_logger(name='log',
 
 sys_logger = LoggerFactory.get_logger()
 sio = socketio.AsyncClient()
-rdc = RawdataController(raw_directory=raw_directory,
-                        external_directory=external_directory)
 
 
 def sensor_config_load(config: ConfigParser):
@@ -92,13 +87,6 @@ async def resample_message(message, sampling_rate, data_tag_names):
     return me
 
 
-async def add_data_by_event(event_name, message):
-    if event_name == 'vib':
-        await rdc.add_vib(message)
-    elif event_name == 'temp':
-        await rdc.add_temp(message)
-
-
 async def try_read(sensor: Sensor, event_name: str, data_tag_names: list):
     now_time = ctime(time())
     data_list = await sensor.read()
@@ -106,7 +94,6 @@ async def try_read(sensor: Sensor, event_name: str, data_tag_names: list):
     resampled_message = await resample_message(message, send_sampling_rate, data_tag_names)
 
     await sio.sleep(1)
-    await add_data_by_event(event_name, message)
     if sio.connected:
         await sio.emit(event_name, resampled_message, namespace=machine_namespace)
 
