@@ -2,7 +2,6 @@ import nidaqmx
 import socketio
 import asyncio
 
-from scipy import signal
 from sys import exit
 from time import ctime, time
 from configparser import ConfigParser
@@ -15,7 +14,6 @@ conf = ConfigParser()
 conf.read('resource/config.ini', encoding='utf-8')
 server_address = conf['socket']['url']
 machine_namespace = conf['socket']['namespace']
-send_sampling_rate = int(conf['socket']['send_sampling_rate'])
 log_path = conf['log']['directory']
 
 
@@ -79,23 +77,14 @@ async def get_sensor_message(now_time, data_tag_names, data_list):
     return message
 
 
-async def resample_message(message, sampling_rate, data_tag_names):
-    me = message.copy()
-    for tag in data_tag_names:
-        me[tag] = signal.resample(me[tag], sampling_rate).tolist()
-
-    return me
-
-
 async def try_read(sensor: Sensor, event_name: str, data_tag_names: list):
     now_time = ctime(time())
     data_list = await sensor.read()
     message = await get_sensor_message(now_time, data_tag_names, data_list)
-    resampled_message = await resample_message(message, send_sampling_rate, data_tag_names)
 
     await sio.sleep(1)
     if sio.connected:
-        await sio.emit(event_name, resampled_message, namespace=machine_namespace)
+        await sio.emit(event_name, message, namespace=machine_namespace)
 
 
 async def read(sensor: Sensor, event_name: str, data_tag_names: list):
