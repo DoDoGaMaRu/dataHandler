@@ -121,13 +121,14 @@ def on_disconnect():
 async def socket_connect():
     while True:
         try:
-            await sio.connect(url=server_address,
-                              namespaces=[machine_namespace],
-                              wait_timeout=10)
+            if not sio.connected:
+                await sio.connect(url=server_address,
+                                  namespaces=[machine_namespace],
+                                  wait_timeout=10)
             await sio.wait()
         except Exception as e:
             sys_logger.error('socket connect error - '+str(e))
-            await sio.sleep(60)
+            await sio.sleep(reconn_interval)
 
 
 if __name__ == '__main__':
