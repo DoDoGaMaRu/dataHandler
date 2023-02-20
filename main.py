@@ -14,12 +14,16 @@ from logger import LoggerFactory
 
 conf = ConfigParser()
 conf.read('resource/config.ini', encoding='utf-8')
-raw_directory = conf['csv']['directory']
-external_directory = conf['csv']['external_directory']
-server_address = conf['socket']['url']
-machine_namespace = conf['socket']['namespace']
-send_sampling_rate = int(conf['socket']['send_sampling_rate'])
-log_path = conf['log']['directory']
+
+raw_directory       = conf['csv']['directory']
+external_directory  = conf['csv']['external_directory']
+
+server_address      = conf['socket']['url']
+machine_namespace   = conf['socket']['namespace']
+send_sampling_rate  = int(conf['socket']['send_sampling_rate'])
+reconn_interval     = int(conf["socket"]["reconnection_interval"])
+
+log_path            = conf['log']['directory']
 
 
 ''' 
@@ -36,7 +40,7 @@ LoggerFactory.init_logger(name='log',
                           save_path=log_path)
 
 sys_logger = LoggerFactory.get_logger()
-sio = socketio.AsyncClient()
+sio = socketio.AsyncClient(reconnection=False)
 rdc = RawdataController(raw_directory=raw_directory,
                         external_directory=external_directory)
 
@@ -143,13 +147,14 @@ def on_disconnect():
 async def socket_connect():
     while True:
         try:
-            await sio.connect(url=server_address,
-                              namespaces=[machine_namespace],
-                              wait_timeout=10)
+            if not sio.connected:
+                await sio.connect(url=server_address,
+                                  namespaces=[machine_namespace],
+                                  wait_timeout=10)
             await sio.wait()
         except Exception as e:
             sys_logger.error('socket connect error - '+str(e))
-            await sio.sleep(60)
+            await sio.sleep(reconn_interval)
 
 
 if __name__ == '__main__':
