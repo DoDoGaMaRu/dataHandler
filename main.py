@@ -12,9 +12,11 @@ from logger import LoggerFactory
 
 conf = ConfigParser()
 conf.read('resource/config.ini', encoding='utf-8')
-server_address = conf['socket']['url']
-machine_namespace = conf['socket']['namespace']
-log_path = conf['log']['directory']
+server_address      = conf['socket']['url']
+machine_namespace   = conf['socket']['namespace']
+reconn_interval     = int(conf["socket"]["reconnection_interval"])
+
+log_path            = conf['log']['directory']
 
 
 ''' 
@@ -31,7 +33,7 @@ LoggerFactory.init_logger(name='log',
                           save_path=log_path)
 
 sys_logger = LoggerFactory.get_logger()
-sio = socketio.AsyncClient()
+sio = socketio.AsyncClient(reconnection=False)
 
 
 def sensor_config_load(config: ConfigParser):
