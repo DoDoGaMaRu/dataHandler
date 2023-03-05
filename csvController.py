@@ -51,8 +51,8 @@ class CsvController:
     async def trigger(self, date):
         is_day_changed = self.last_date != date
         if is_day_changed:
-            await self.move_old_files()
             self.last_date = date
+            await self.move_old_files()
 
     async def move_old_files(self):
         files = os.listdir(self.directory)
